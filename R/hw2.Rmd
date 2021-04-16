@@ -1,0 +1,506 @@
+---
+title: " Homework :Chengkan Tao"
+author:
+  - chengkan_tao
+  - 
+  - 
+documentclass: ctexart
+keywords:
+  - 中文
+  - R Markdown
+output:
+  rticles::ctex
+---
+```{r eval=FALSE}
+devtools::install_github(c('rstudio/rmarkdown', 'yihui/tinytex'))
+tinytex::install_tinytex()
+```
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r, include=FALSE}
+options(tinytex.verbose = TRUE)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#1
+```{r, include=FALSE}
+library(tidyverse)
+library(haven)
+library(dplyr)
+library(tidyverse)
+library(haven)
+read_data <- function(df)
+{
+  full_path <- paste("https://raw.github.com/scunning1975/mixtape/master/", 
+                     df, sep = "")
+  df <- read_dta(full_path)
+  return(df)
+}
+nsw_dw_cpscontrol = read_data("cps_mixtape.dta")
+
+nsw_mixtape = read_data("nsw_mixtape.dta")
+
+nsw_dw = bind_rows(nsw_dw_cpscontrol,nsw_mixtape)
+
+nsw_dw_cpscontrol <- read_data("cps_mixtape.dta") %>% 
+  bind_rows(nsw_dw) %>% 
+  mutate(agesq = age^2,
+         agecube = age^3,
+         educsq = educ*educ,
+         educcube = educ*educ*educ,
+         u74 = case_when(re74 == 0 ~ 1, TRUE ~ 0),
+         u75 = case_when(re75 == 0 ~ 1, TRUE ~ 0),
+         interaction1 = educ*re74,
+         re74sq = re74^2,
+         re74cube = re74^3,
+         re75sq = re75^2,
+         re75cube = re75^3,
+         interaction2 = u74*hisp)
+
+```
+
+
+
+#estimating
+```{r,echo=FALSE}
+logit_nsw <- glm(treat ~ age + agesq + agecube + educ + educsq + educcube +
+                   marr + nodegree + black + hisp + re74 + re75 + u74 +
+                   u75 + interaction1, family = binomial(link = "logit"), 
+                 data = nsw_dw_cpscontrol)
+
+linear_nsw <- lm(treat ~ age + agesq + educ + educsq +
+                   marr + nodegree + black + hisp + re74 + re75 + u74 +
+                   u75 + interaction2, 
+                 data = nsw_dw_cpscontrol)
+
+```
+There are two models:one is LPM with quadratic for some variables , the other is logit model with cube for some variables.
+```{r, echo=FALSE}
+summary(linear_nsw)
+summary(logit_nsw)
+```
+
+```{r, include=FALSE}
+nsw_dw_cpscontrol <- nsw_dw_cpscontrol %>% 
+  mutate(logit_pscore = logit_nsw$fitted.values) %>%
+  mutate(linear_pscore = linear_nsw$fitted.value)
+```
+We add score into dataset
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#histogram
+#logit
+```{r,echo=FALSE}
+nsw_dw_cpscontrol %>% 
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = logit_pscore))
+
+nsw_dw_cpscontrol %>% 
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = logit_pscore))
+```
+The first histogram doesn't look good
+
+
+
+
+
+
+#LPM
+```{r,echo=FALSE}
+nsw_dw_cpscontrol %>% 
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = linear_pscore))
+
+nsw_dw_cpscontrol %>% 
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = linear_pscore))
+
+```
+Four histogram shows the PS distribution of two models pretty well.
+
+
+
+
+
+
+
+
+#min and max
+```{r,echo=FALSE}
+max_pscore_logit = nsw_dw_cpscontrol %>% 
+  filter(treat == 0) %>% 
+  pull(logit_pscore) %>% 
+  max()
+max_pscore_logit
+
+min_pscore_logit = nsw_dw_cpscontrol %>% 
+  filter(treat == 0) %>% 
+  pull(logit_pscore) %>% 
+  min()
+min_pscore_logit
+
+```
+This is min and max of propensity score of logit model in the control group
+
+
+```{r, echo=FALSE}
+max_pscore_treat_logit = nsw_dw_cpscontrol %>% 
+  filter(treat == 1) %>% 
+  pull(logit_pscore) %>% 
+  max()
+max_pscore_treat_logit
+
+min_pscore_treat_logit = nsw_dw_cpscontrol %>% 
+  filter(treat == 1) %>% 
+  pull(logit_pscore) %>% 
+  min()
+min_pscore_treat_logit
+
+
+
+```
+This is min and max of propensity score of logit model in the treatment group. The max in this group is close to max in the control group. Both min is very close to zero.
+```{r,echo=FALSE}
+max_pscore_linear = nsw_dw_cpscontrol %>% 
+  filter(treat == 0) %>% 
+  pull(linear_pscore) %>% 
+  max()
+max_pscore_linear
+
+min_pscore_linear = nsw_dw_cpscontrol %>% 
+  filter(treat == 0) %>% 
+  pull(linear_pscore) %>% 
+  min()
+min_pscore_linear
+
+
+```
+This is min and max of propensity score of LPM in the control group
+
+```{r, echo=FALSE}
+max_pscore_treat_linear = nsw_dw_cpscontrol %>% 
+  filter(treat == 1) %>% 
+  pull(linear_pscore) %>% 
+  max()
+max_pscore_treat_linear
+
+min_pscore_treat_linear = nsw_dw_cpscontrol %>% 
+  filter(treat == 1) %>% 
+  pull(linear_pscore) %>% 
+  min()
+min_pscore_treat_linear
+```
+This is min and max of propensity score of LPM in the treatment group. Both max and min are close to min and max in the control group.
+
+
+
+
+
+
+
+
+
+
+
+#drop
+```{r,include=FALSE}
+nsw_cpscontrol_logit_drop = nsw_dw_cpscontrol%>%
+  filter(logit_pscore>0.1)
+
+nsw_cpscontrol_logit_drop = nsw_cpscontrol_logit_drop%>%
+  filter(logit_pscore<0.9)
+
+nsw_cpscontrol_linear_drop = nsw_dw_cpscontrol%>%
+  filter(logit_pscore>0.1)
+
+nsw_cpscontrol_linear_drop = nsw_cpscontrol_linear_drop%>%
+  filter(logit_pscore<0.9)
+
+
+
+```
+Drop all units whose propensity scores are less than 0.1 and more than 0.9
+
+
+
+
+
+
+
+
+
+
+
+
+
+#logit
+```{r, echo=FALSE}
+
+nsw_cpscontrol_logit_drop %>% 
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = logit_pscore))
+
+nsw_cpscontrol_logit_drop %>% 
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = logit_pscore))
+```
+
+
+
+
+
+
+
+
+
+
+#LPM
+```{r, echo=FALSE}
+nsw_cpscontrol_linear_drop %>% 
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = linear_pscore))
+
+nsw_cpscontrol_linear_drop %>% 
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = linear_pscore))
+```
+These four histogram shows the PS distribution of two models. The distributions in the same model look similar.
+
+
+
+
+
+
+
+
+
+
+
+#min and max
+```{r, echo=FALSE}
+max_pscore_logit = nsw_cpscontrol_logit_drop %>% 
+  filter(treat == 0) %>% 
+  pull(logit_pscore) %>% 
+  max()
+max_pscore_logit
+
+min_pscore_logit = nsw_cpscontrol_logit_drop %>% 
+  filter(treat == 0) %>% 
+  pull(logit_pscore) %>% 
+  min()
+min_pscore_logit
+```
+This is min and max of propensity score of logit model in the control group
+
+
+```{r, echo=FALSE}
+max_pscore_treat_logit = nsw_cpscontrol_logit_drop %>% 
+  filter(treat == 1) %>% 
+  pull(logit_pscore) %>% 
+  max()
+max_pscore_treat_logit
+
+min_pscore_treat_logit = nsw_cpscontrol_logit_drop %>% 
+  filter(treat == 1) %>% 
+  pull(logit_pscore) %>% 
+  min()
+min_pscore_treat_logit
+
+```
+This is min and max of propensity score of logit model in the treatment group.
+
+
+```{r, echo=FALSE}
+
+
+max_pscore_linear = nsw_cpscontrol_linear_drop %>% 
+  filter(treat == 0) %>% 
+  pull(linear_pscore) %>% 
+  max()
+max_pscore_linear
+
+min_pscore_linear = nsw_cpscontrol_linear_drop %>% 
+  filter(treat == 0) %>% 
+  pull(linear_pscore) %>% 
+  min()
+min_pscore_linear
+
+```
+This is min and max of propensity score of LPM in the control group.
+
+
+```{r, echo=FALSE}
+max_pscore_treat_linear = nsw_cpscontrol_linear_drop %>% 
+  filter(treat == 1) %>% 
+  pull(linear_pscore) %>% 
+  max()
+max_pscore_treat_linear
+
+min_pscore_treat_linear = nsw_cpscontrol_linear_drop %>% 
+  filter(treat == 1) %>% 
+  pull(linear_pscore) %>% 
+  min()
+min_pscore_treat_linear
+```
+This is min and max of propensity score of LPM in the treatment group.
+
+We can find in the same model, min and max in control group are nearly equal to min and max in the treatment group.
+
+
+#2
+```{r, echo=FALSE}
+x1_78 = nsw_mixtape %>% 
+  filter(treat == 1) %>% 
+  pull(re78) %>% 
+  mean()
+
+x0_78 = nsw_mixtape %>% 
+  filter(treat == 0) %>% 
+  pull(re78) %>% 
+  mean()
+
+average_treatment_effect_78 = unique(x1_78 - x0_78)
+
+x1_75 = nsw_mixtape %>% 
+  filter(treat == 1) %>% 
+  pull(re75) %>% 
+  mean()
+
+x0_75 = nsw_mixtape %>% 
+  filter(treat == 0) %>% 
+  pull(re75) %>% 
+  mean()
+
+average_treatment_effect_75 = unique(x1_75 - x0_75)
+
+x1_74 = nsw_mixtape %>% 
+  filter(treat == 1) %>% 
+  pull(re74) %>% 
+  mean()
+
+x0_74 = nsw_mixtape %>% 
+  filter(treat == 0) %>% 
+  pull(re74) %>% 
+  mean()
+
+average_treatment_effect_74 = unique(x1_74 - x0_74)
+
+average_treatment_effect_74
+average_treatment_effect_75
+average_treatment_effect_78
+```
+
+The training program caused real earnings in 1974 to decrease by $11.453
+The training program caused real earnings in 1975 to increase by $265.146
+The training program caused real earnings in 1978 to increase by $1794.342
+
+#3
+```{r, echo=FALSE}
+N <- nrow(nsw_dw_cpscontrol)
+
+nsw_dw_cpscontrol <- nsw_dw_cpscontrol %>% 
+  mutate(d1 = treat/logit_pscore,
+         d0 = (1-treat)/(1-logit_pscore))
+
+s1 <- sum(nsw_dw_cpscontrol$d1)
+s0 <- sum(nsw_dw_cpscontrol$d0)
+
+
+nsw_dw_cpscontrol <- nsw_dw_cpscontrol %>% 
+  mutate(y1 = treat * re75/logit_pscore,
+         y0 = (1-treat) * re75/(1-logit_pscore),
+         ht = y1 - y0)
+
+nsw_dw_cpscontrol <- nsw_dw_cpscontrol %>% 
+  mutate(y1_weighted = (treat*re75/logit_pscore)/(s1/N),
+         y0_weughted = ((1-treat)*re75/(1-logit_pscore))/(s0/N),
+         norm = y1_weighted - y0_weughted)
+
+nsw_dw_cpscontrol %>% 
+  pull(ht) %>% 
+  mean()
+
+nsw_dw_cpscontrol %>% 
+  pull(norm) %>% 
+  mean()
+
+nsw_dw_cpscontrol <- nsw_dw_cpscontrol %>% 
+  mutate(d1 = treat/logit_pscore,
+         d0 = (1-treat)/(1-logit_pscore))
+
+s1 <- sum(nsw_dw_cpscontrol$d1)
+s0 <- sum(nsw_dw_cpscontrol$d0)
+
+
+nsw_dw_cpscontrol <- nsw_dw_cpscontrol %>% 
+  mutate(y1_74 = treat * re74/logit_pscore,
+         y0_74 = (1-treat) * re74/(1-logit_pscore),
+         ht_74 = y1_74 - y0_74)
+
+nsw_dw_cpscontrol <- nsw_dw_cpscontrol %>% 
+  mutate(y1_weighted74 = (treat*re74/logit_pscore)/(s1/N),
+         y0_weighted74 = ((1-treat)*re74/(1-logit_pscore))/(s0/N),
+         norm_74 = y1_weighted74 - y0_weighted74)
+
+nsw_dw_cpscontrol %>% 
+  pull(ht_74) %>% 
+  mean()
+
+nsw_dw_cpscontrol %>% 
+  pull(norm_74) %>% 
+  mean()
+```
+I use two models to estimate ATT. In the logit model, i found estimated ATT of -$11873.59, and -$7592.795 with the normalization of the weights.
+In the LPM, i found estimated ATT of -$12403.43, and -$8545.048 with the normalization of the weights.
+
+
+
+
+
+
